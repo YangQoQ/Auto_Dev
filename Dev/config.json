@@ -1,0 +1,24 @@
+{
+  "database": {
+    "ip": "192.168.0.1",
+    "name": "sa",
+    "pwd": "XJHZ1",
+    "nqpeisname": "NQPeis",
+    "wechatpeisname": "SULL.M.Peis"
+  },
+  "devfilepath": {
+    "wechatapi": "D:\\HosDev\\taskApi.zip",
+    "wechatworkplanapi": "",
+    "taskapi": "",
+    "wechatview": "",
+    "wechatworkplanview": ""
+  },
+  "storefilepath": {
+    "storedisk": "D:",
+    "storewechatapi": "D:\\TJ\\Web\\WeChatApi",
+    "storeworkplanapi": "D:\\TJ\\Web\\WeChatWorkPlanApi",
+    "storetaskapi": "D:\\TJ\\Web\\TaskApi",
+    "storewechatview": "D:\\TJ\\Web\\WeChatView",
+    "stroeworkplanview": "D:\\TJ\\Web\\WeChatPlanView"
+  }
+}
