@@ -2,20 +2,13 @@
 package main
 
 import (
-	"archive/zip"
-	"encoding/json"
-	"errors"
-	"fmt"
+	"WeChatAutoDev/Dev/Struct"
+	"WeChatAutoDev/Dev/Util"
 	"github.com/axgle/mahonia"
-	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
-	"syscall"
-	"unsafe"
 )
 
 // 配置信息
@@ -49,11 +42,7 @@ type Config struct {
 
 func main() {
 	// 读取配置文件
-	config, err := ReadConfig("Dev/config.json")
-	if err != nil {
-		ShowMessage("Error", "无法读取配置文件")
-		return
-	}
+	config := Struct.ReadFile()
 
 	// 创建存放文件夹
 	folderPaths := [...]string{
@@ -77,7 +66,7 @@ func main() {
 	iisout, _ := iisCmdCheck.CombinedOutput()
 	iiResult := mahonia.NewDecoder("gbk").ConvertString(string(iisout))
 	if !strings.Contains(iiResult, "RUNNING") {
-		ShowMessage("Error", "请安装iis")
+		Util.ShowMessage("Error", "请安装iis")
 	}
 
 	// 检查是否安装了microsoftrootcertificateauthority2011微软证书
@@ -105,7 +94,7 @@ func main() {
 					if storeFilePath != nil {
 						err := os.MkdirAll(filePath, os.ModePerm)
 						if err != nil {
-							ShowMessage("Error", "文件夹创建失败"+filePath)
+							Util.ShowMessage("Error", "文件夹创建失败"+filePath)
 							break
 						}
 
@@ -115,7 +104,7 @@ func main() {
 						}
 
 						// 解压文件到指定目录
-						Unzip(devFolderMap[filePath], filePath)
+						Util.Unzip(devFolderMap[filePath], filePath)
 
 						// 修改各个项目配置文件中数据库连接，通过存放路径获取到webconfig文件
 
@@ -125,12 +114,12 @@ func main() {
 				}
 
 			} else if os.IsNotExist(err) {
-				ShowMessage("Error", "不存在磁盘"+config.Storefilepath.Storedisk)
+				Util.ShowMessage("Error", "不存在磁盘"+config.Storefilepath.Storedisk)
 			}
 			return
 		} else {
 			// 安装 .NET Framework 4.7.2
-			ShowMessage("Error", "请安装 .NET Framework 4.7.2")
+			Util.ShowMessage("Error", "请安装 .NET Framework 4.7.2")
 			// cmd := exec.Command("powershell", "Start-Process", "-Verb", "runAs", "D:\\ndp472-devpack-enu.exe")
 			// err := cmd.Run()
 			// if err != nil {// log.Fatal(err)
@@ -138,100 +127,6 @@ func main() {
 			return
 		}
 	} else {
-		ShowMessage("Error", "失败原因: 需安装微信任根颁发机构的证书")
+		Util.ShowMessage("Error", "失败原因: 需安装微软根颁发机构的证书")
 	}
-}
-
-// 弹框提示组成方法
-func IntPtr(n int) uintptr {
-	return uintptr(n)
-}
-
-// 弹框提示组成方法
-func StrPtr(s string) uintptr {
-	return uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(s)))
-}
-
-// ShowMessage windows下的另一种DLL方法调用
-func ShowMessage(tittle, text string) {
-	user32dll, _ := syscall.LoadLibrary("user32.dll")
-	user32 := syscall.NewLazyDLL("user32.dll")
-	MessageBoxW := user32.NewProc("MessageBoxW")
-	MessageBoxW.Call(IntPtr(0), StrPtr(text), StrPtr(tittle), IntPtr(0))
-	defer syscall.FreeLibrary(user32dll)
-}
-
-// 读取config.json配置文件并适配Config对象
-func ReadConfig(filename string) (Config, error) {
-	var config Config
-
-	// 打开并读取文件
-	file, err := os.Open(filename)
-	if err != nil {
-		return config, fmt.Errorf("打开文件时发生错误: %v", err)
-	}
-	defer file.Close()
-
-	// 检查文件大小
-	stat, err := file.Stat()
-	if err != nil {
-		return config, fmt.Errorf("获取文件信息时发生错误: %v", err)
-	}
-	if stat.Size() == 0 {
-		return config, errors.New("文件为空")
-	}
-
-	// 读取文件内容
-	data, err := ioutil.ReadAll(file)
-	if err != nil {
-		return config, fmt.Errorf("读取文件时发生错误: %v", err)
-	}
-
-	// 解析 JSON
-	err = json.Unmarshal(data, &config)
-	if err != nil {
-		return config, fmt.Errorf("解析 JSON 时发生错误: %v", err)
-	}
-
-	return config, nil
-}
-
-// 程序包解压缩
-func Unzip(src string, destDir string) error {
-	// 第一步，打开 zip 文件
-	zipFile, err := zip.OpenReader(src)
-	if err != nil {
-		ShowMessage("Error", "压缩文件格式必须为zip")
-		panic(err)
-	}
-	defer zipFile.Close()
-
-	// 第二步，遍历 zip 中的文件
-	for _, f := range zipFile.File {
-		filePath := mahonia.NewDecoder("gbk").ConvertString(filepath.Join(destDir, f.Name))
-		if f.FileInfo().IsDir() {
-			_ = os.MkdirAll(filePath, os.ModePerm)
-			continue
-		}
-		// 创建对应文件夹
-		if err := os.MkdirAll(filepath.Dir(filePath), os.ModePerm); err != nil {
-			panic(err)
-		}
-		// 解压到的目标文件
-		dstFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
-		if err != nil {
-			panic(err)
-		}
-		file, err := f.Open()
-		if err != nil {
-			panic(err)
-		}
-		// 写入到解压到的目标文件
-		if _, err := io.Copy(dstFile, file); err != nil {
-			panic(err)
-		}
-		dstFile.Close()
-		file.Close()
-	}
-	return nil
 }
