@@ -4,41 +4,15 @@ package main
 import (
 	"WeChatAutoDev/Dev/Struct"
 	"WeChatAutoDev/Dev/Util"
+	"fmt"
+	"github.com/antchfx/xmlquery"
 	"github.com/axgle/mahonia"
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
-
-// 配置信息
-type Config struct {
-	// 数据库配置结构体
-	Database struct {
-		Ip             string `json:"ip"`             // 体检数据服务器
-		Name           string `json:"name"`           // 账号
-		Pwd            string `json:"pwd"`            // 密码
-		Nqpeisname     string `json:"nqpeisname"`     // 体检数据库名称
-		Wechatpeisname string `json:"wechatpeisname"` // 体检微信数据库名称
-	} `json:"database"`
-	// 文件部署地址 （拷贝到前置机上准备部署的文件路径）
-	Devfilepath struct {
-		Wechatapi          string `json:"wechatapi"`          // 微信体检服务Api部署路径
-		Wechatworkplanapi  string `json:"wechatworkplanapi"`  // 微信排班系统Api部署路径
-		Taskapi            string `json:"taskapi"`            // TaskApi部署文件路径
-		Wechatview         string `json:"wechatview"`         // 微信体检前端页面部署路径
-		Wechatworkplanview string `json:"wechatworkplanview"` // 微信排班页面部署路径
-	} `json:"devfilepath"`
-	// 文件存放地址 （部署文件存放路径）
-	Storefilepath struct {
-		Storedisk         string `json:"storedisk"`         // 磁盘存放位置
-		Storewechatapi    string `json:"storewechatapi"`    // 微信体检服务api磁盘存放位置
-		Storeworkplanapi  string `json:"storeworkplanapi"`  // 微信排班api磁盘存放位置
-		Storetaskapi      string `json:"storetaskapi"`      // 微信Taskapi磁盘存放位置
-		Storewechatview   string `json:"storewechatview"`   // 微信体检服务前端页面磁盘存放位置
-		Stroeworkplanview string `json:"stroeworkplanview"` // 微信体检服务排班页面磁盘存放位置
-	} `json:"storefilepath"`
-}
 
 func main() {
 	// 读取配置文件
@@ -104,9 +78,17 @@ func main() {
 						}
 
 						// 解压文件到指定目录
-						Util.Unzip(devFolderMap[filePath], filePath)
+						destPath, _ := Util.Unzip(devFolderMap[filePath], filePath)
 
-						// 修改各个项目配置文件中数据库连接，通过存放路径获取到webconfig文件
+						// 修改各个项目配置文件中数据库连接，通过存放路径获取到webconfig
+						targetFile, err := HandelWebConfig(destPath)
+						if err != nil {
+							Util.ShowMessage("Error", err.Error())
+							return
+						}
+
+						// 找到文件后修改文件中DB配置
+						fmt.Println("找到Web.Config文件:", targetFile)
 
 						// 部署iis
 
@@ -129,4 +111,49 @@ func main() {
 	} else {
 		Util.ShowMessage("Error", "失败原因: 需安装微软根颁发机构的证书")
 	}
+}
+
+// 处理WebConfig文件
+func HandelWebConfig(filePath string) (string, error) {
+	// 找到对应的配置文件
+	targetFile := filepath.Join(filePath, "Web.config")
+	// 检查文件是否存在
+	_, err := os.Stat(targetFile)
+	if err == nil {
+		// 找到文件后修改配置文件
+		_, err := ModifyWebConfig(targetFile)
+		if err != nil {
+			return "修改WebConfig文件失败", err
+		}
+	} else if os.IsNotExist(err) {
+		return "", fmt.Errorf("文件 %s 不存在", targetFile)
+	}
+	return "", err
+}
+
+// 修改WebConfig指定结点
+func ModifyWebConfig(modeifyPath string) (string, error) {
+	// 价值Xml文件
+	webXMl, err := os.Open(modeifyPath)
+	if err != nil {
+		panic(err)
+	}
+
+	// Parse XML document.
+	weDoc, err := xmlquery.Parse(webXMl)
+	if err != nil {
+		panic(err)
+	}
+
+	// Find the connection string node
+	node := xmlquery.FindOne(weDoc, "//connectionStrings//add[@name='SULL3']")
+	if node != nil {
+		// Modify the connection string attribute
+		node.Attr[1].Value = "YourNewConnectionString"
+		// 结点修改后保存文件
+		
+	} else {
+		fmt.Println("Connection string node not found.")
+	}
+	return "", nil
 }
